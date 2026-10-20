@@ -1,0 +1,11 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {products,categories,getResults,featuredIds,searchUrl}=require('./app.js');
+const results=(category='all',query='',sort='rank',saved=new Set(),onlySaved=false)=>getResults(category,query,sort,saved,onlySaved);
+test('each category includes exactly ten distinct products',()=>{for(const c of categories){const list=results(c.id);assert.equal(list.length,10);assert.equal(new Set(list.map(p=>p.id)).size,10);assert.deepEqual(list.map(p=>p.rank),[1,2,3,4,5,6,7,8,9,10]);}});
+test('all featured references exist and every ID is unique',()=>{assert.equal(new Set(products.map(p=>p.id)).size,30);for(const id of featuredIds)assert.ok(products.find(p=>p.id===id));});
+test('search supports Persian, English and normalized Arabic letters',()=>{assert.ok(results('phones','اپل').length>0);assert.ok(results('phones','SAMSUNG').length>0);assert.ok(results('phones','گوشي').length>0);assert.equal(results('all','not-a-product').length,0);assert.equal(results('all','   ').length,10);});
+test('price sorting respects ascending and descending order',()=>{for(const sort of ['price-asc','price-desc']){const list=results('all','',sort);for(let i=1;i<list.length;i++)assert.ok(sort==='price-asc'?list[i].price>=list[i-1].price:list[i].price<=list[i-1].price);}});
+test('rating sorting and queries preserve product data',()=>{const list=results('all','','rating');for(let i=1;i<list.length;i++)assert.ok(list[i].rating<=list[i-1].rating);assert.equal(products[0].rank,1);assert.equal(results().length,10);});
+test('saved view works across categories and handles empty state',()=>{assert.equal(results('all','','rank',new Set(),true).length,0);const saved=new Set(['phones-0','laptops-2','accessories-5']);assert.equal(results('all','','rank',saved,true).length,3);assert.equal(results('all','اپل','rank',saved,true).length,1);});
+test('external links safely encode product queries',()=>{for(const p of products){const url=new URL(searchUrl(p));assert.equal(url.hostname,'www.digikala.com');assert.equal(url.searchParams.get('q'),p.name);assert.ok(p.price>0);assert.ok(p.discount>0&&p.discount<100);assert.ok(p.rating<=5&&p.rating>0);}});
